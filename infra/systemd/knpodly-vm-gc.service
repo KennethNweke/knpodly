@@ -1,0 +1,11 @@
+# Optional safety-net service: periodically reconciles libvirt state against
+# the database in case the scheduler container was down when a VM expired
+# (e.g. host reboot mid-lab). Not required if the `scheduler` container is
+# healthy, but recommended as a belt-and-braces cron-style check.
+[Unit]
+Description=Knpodly orphaned VM/overlay garbage collection
+After=knpodly.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker compose -f /srv/knpodly/docker-compose.prod.yml exec -T backend python -m app.workers.gc_orphaned_vms

@@ -1,0 +1,147 @@
+# Production compose file.
+# Usage: docker compose -f docker-compose.prod.yml --env-file .env up -d
+#
+# NOTE ON LIBVIRT: the backend and vm-worker containers need access to the
+# host's libvirtd socket to manage real KVM/QEMU VMs. This is done by
+# bind-mounting /var/run/libvirt into the containers and running them with
+# a group that has access to it (see docs/INSTALL_UBUNTU.md). Do NOT run
+# these containers as unrestricted --privileged; the bind mount + group
+# membership is sufficient and far narrower in scope.
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: prod
+    restart: always
+    env_file: .env
+    volumes:
+      - vm_images:/srv/knpodly/VMImages
+      - vm_icons:/srv/knpodly/VMIcons
+      - vm_overlays:/srv/knpodly/overlays
+      - /var/run/libvirt:/var/run/libvirt
+    group_add:
+      - "${LIBVIRT_GID:-130}"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  vm-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: prod
+    restart: always
+    env_file: .env
+    volumes:
+      - vm_images:/srv/knpodly/VMImages
+      - vm_icons:/srv/knpodly/VMIcons
+      - vm_overlays:/srv/knpodly/overlays
+      - /var/run/libvirt:/var/run/libvirt
+    group_add:
+      - "${LIBVIRT_GID:-130}"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: arq app.workers.vm_worker.WorkerSettings
+    deploy:
+      replicas: 2
+
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: prod
+    restart: always
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: python -m app.workers.scheduler
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: prod
+    restart: always
+    env_file: .env
+    expose:
+      - "80"
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: always
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot_www:/var/www/certbot
+      - certbot_certs:/etc/letsencrypt
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+      - frontend
+
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_certs:/etc/letsencrypt
+    entrypoint: >
+      sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done"
+
+volumes:
+  pgdata:
+  redisdata:
+  vm_images:
+  vm_icons:
+  vm_overlays:
+  certbot_www:
+  certbot_certs:

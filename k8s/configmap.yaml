@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: knpodly-config
+  namespace: knpodly
+data:
+  ENVIRONMENT: "production"
+  APP_URL: "https://labs.example.edu"
+  LOG_LEVEL: "INFO"
+  LIBVIRT_DRIVER: "qemu"
+  LIBVIRT_URI: "qemu+tls://libvirt-host.example.internal/system"
+  VM_IMAGES_PATH: "/srv/knpodly/VMImages"
+  VM_ICONS_PATH: "/srv/knpodly/VMIcons"
+  VM_OVERLAY_PATH: "/srv/knpodly/overlays"
+  VM_NETWORK_BRIDGE: "knpodly-labnet"
+  VM_VNC_HOST: "libvirt-host.example.internal"
+  SESSION_MAX_DURATION_MINUTES: "120"
+  IDLE_TIMEOUT_MINUTES: "20"
+  BACKEND_IMAGE: "your-registry/knpodly-backend:v0.1.0"
+  FRONTEND_IMAGE: "your-registry/knpodly-frontend:v0.1.0"

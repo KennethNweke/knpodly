@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: knpodly-scheduler
+  namespace: knpodly
+spec:
+  replicas: 1  # exactly one — the expiry/idle sweep and filesystem watcher must not run concurrently
+  selector:
+    matchLabels: { app: knpodly-scheduler }
+  template:
+    metadata:
+      labels: { app: knpodly-scheduler }
+    spec:
+      containers:
+        - name: scheduler
+          image: your-registry/knpodly-backend:v0.1.0
+          command: ["python", "-m", "app.workers.scheduler"]
+          envFrom:
+            - configMapRef: { name: knpodly-config }
+            - secretRef: { name: knpodly-secrets }
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits: { cpu: "500m", memory: "256Mi" }

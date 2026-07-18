@@ -1,0 +1,10 @@
+{
+  "name": "Ubuntu 24.04",
+  "family": "Debian",
+  "packageManager": "apt",
+  "ram": "2GB",
+  "vcpus": 2,
+  "architecture": "x86_64",
+  "description": "Ubuntu LTS — general-purpose Linux distribution suitable for beginners.",
+  "status": "Available"
+}

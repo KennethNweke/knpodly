@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: knpodly-ingress
+  namespace: knpodly
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"   # adjust to your cluster's cert-manager setup
+    nginx.ingress.kubernetes.io/proxy-body-size: "50g"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+spec:
+  tls:
+    - hosts: ["labs.example.edu"]
+      secretName: knpodly-tls
+  rules:
+    - host: labs.example.edu
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service: { name: knpodly-backend, port: { number: 8000 } }
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service: { name: knpodly-backend, port: { number: 8000 } }
+          - path: /console
+            pathType: Prefix
+            backend:
+              service: { name: knpodly-backend, port: { number: 8000 } }
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: knpodly-frontend, port: { number: 80 } }

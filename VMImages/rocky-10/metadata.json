@@ -1,0 +1,10 @@
+{
+  "name": "Rocky Linux 10",
+  "family": "RHEL",
+  "packageManager": "dnf",
+  "ram": "2GB",
+  "vcpus": 2,
+  "architecture": "x86_64",
+  "description": "Enterprise-grade, RHEL-compatible distribution ideal for sysadmin labs.",
+  "status": "Available"
+}

@@ -1,0 +1,116 @@
+# Development compose file.
+# Runs full stack with hot-reload for backend and frontend.
+# For production, use docker-compose.prod.yml
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-knpodly}
+      POSTGRES_USER: ${POSTGRES_USER:-knpodly}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-knpodly}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: dev
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      LIBVIRT_DRIVER: ${LIBVIRT_DRIVER:-fake}
+    volumes:
+      - ./backend:/app
+      - vm_images:/srv/knpodly/VMImages
+      - vm_icons:/srv/knpodly/VMIcons
+      - vm_overlays:/srv/knpodly/overlays
+      # Uncomment to give the backend real libvirt access on the host (production only):
+      # - /var/run/libvirt/libvirt-sock:/var/run/libvirt/libvirt-sock
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  vm-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: dev
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      LIBVIRT_DRIVER: ${LIBVIRT_DRIVER:-fake}
+    volumes:
+      - ./backend:/app
+      - vm_images:/srv/knpodly/VMImages
+      - vm_icons:/srv/knpodly/VMIcons
+      - vm_overlays:/srv/knpodly/overlays
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: arq app.workers.vm_worker.WorkerSettings
+
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: dev
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: python -m app.workers.scheduler
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    command: npm run dev -- --host 0.0.0.0
+
+volumes:
+  pgdata:
+  vm_images:
+  vm_icons:
+  vm_overlays:

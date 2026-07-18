@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: knpodly-frontend
+  namespace: knpodly
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: knpodly-frontend }
+  template:
+    metadata:
+      labels: { app: knpodly-frontend }
+    spec:
+      containers:
+        - name: frontend
+          image: your-registry/knpodly-frontend:v0.1.0
+          ports: [{ containerPort: 80 }]
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+            limits: { cpu: "250m", memory: "128Mi" }

@@ -1,0 +1,10 @@
+{
+  "name": "Arch Linux",
+  "family": "Arch",
+  "packageManager": "pacman",
+  "ram": "1GB",
+  "vcpus": 2,
+  "architecture": "x86_64",
+  "description": "Minimal, rolling-release distribution for advanced Linux fundamentals labs.",
+  "status": "Available"
+}
